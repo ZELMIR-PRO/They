@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Apocalypse</title>
+    <style>
+        body {
+            background-color: #050505;
+            color: #d4d4d4;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Контейнер для радио-гифки */
+        #radio-view {
+            position: relative;
+            width: 500px;
+            height: 400px;
+            background-image: url('img/radio.gif');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            border-bottom: 5px solid #222;
+        }
+
+        /* Оверлей для создания атмосферы (виньетка) */
+        #overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 50%, black 120%);
+            pointer-events: none;
+        }
+
+        /* Стилизация интерфейса управления */
+        #controls {
+            width: 500px;
+            background: #1a1a1a;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 2px solid #333;
+            border-top: none;
+        }
+
+        #frequency-display {
+            font-size: 32px;
+            color: #ff3300;
+            text-shadow: 0 0 10px #ff3300;
+            background: #000;
+            padding: 10px 30px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #444;
+        }
+
+        /* Сама крутилка (input range) */
+        #tuner {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 15px;
+            background: #333;
+            outline: none;
+            border-radius: 10px;
+        }
+
+        #tuner::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 40px;
+            height: 40px;
+            background: #555;
+            border: 3px solid #888;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        #start-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen" onclick="startRadio()">
+        <h1>НАЖМИТЕ, ЧТОБЫ ВКЛЮЧИТЬ ПИТАНИЕ</h1>
+    </div>
+
+    <div id="radio-view">
+        <div id="overlay"></div>
+    </div>
+
+    <div id="controls">
+        <div id="frequency-display">--.- MHz</div>
+        <input type="range" id="tuner" min="870" max="1080" value="880" step="1">
+        <p style="font-size: 10px; color: #555; margin-top: 15px;">TUNING SENSITIVITY v.0.1</p>
+    </div>
+
+    <audio id="noise-audio" loop>
+        <source src="https://www.soundjay.com/communication/sounds/radio-static-01.mp3" type="audio/mpeg">
+    </audio>
+
+    <audio id="voice-audio" loop>
+        <source src="zvuk/9112007.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const tuner = document.getElementById('tuner');
+        const freqDisplay = document.getElementById('frequency-display');
+        const noise = document.getElementById('noise-audio');
+        const voice = document.getElementById('voice-audio');
+        const startScreen = document.getElementById('start-screen');
+
+        // Частота, на которой будет слышен мужчина (91.1 MHz)
+        const targetFrequency = 91.1;
+
+        function startRadio() {
+            startScreen.style.display = 'none';
+            noise.play();
+            voice.play();
+            // Сразу ставим громкость голоса на 0
+            voice.volume = 0;
+            updateTuning();
+        }
+
+        function updateTuning() {
+            const currentFreq = tuner.value / 10;
+            freqDisplay.innerText = currentFreq.toFixed(1) + " MHz";
+
+            // Расчет дистанции до сигнала
+            const distance = Math.abs(currentFreq - targetFrequency);
+            
+            // Радиус уверенного приема (например, 0.8 MHz вокруг цели)
+            let signalStrength = 0;
+            if (distance < 0.8) {
+                signalStrength = 1 - (distance / 0.8);
+            }
+
+            // Управление громкостью
+            // Чем ближе к цели, тем громче голос и чуть тише шум
+            voice.volume = signalStrength;
+            
+            // Шум всегда остается фоном, но при хорошем сигнале чуть затихает
+            noise.volume = Math.max(0.2, 1 - (signalStrength * 0.8));
+        }
+
+        tuner.addEventListener('input', updateTuning);
+    </script>
+</body>
+</html>
