@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Radio Apocalypse Mobile</title>
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #eee;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* Контейнер для видео/гифки */
+        #viewport {
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 16 / 9;
+            background-image: url('img/radio.gif');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+
+        #vignette {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.9) 110%);
+            pointer-events: none;
+        }
+
+        /* Панель управления снизу */
+        #ui-panel {
+            width: 100%;
+            max-width: 500px;
+            padding: 25px;
+            box-sizing: border-box;
+            background: linear-gradient(to bottom, #151515, #0a0a0a);
+            border-top: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #freq-display {
+            font-size: 42px;
+            font-weight: bold;
+            color: #ff4500;
+            text-shadow: 0 0 15px rgba(255, 69, 0, 0.6);
+            margin-bottom: 25px;
+            letter-spacing: 2px;
+        }
+
+        /* Кастомный ползунок для пальца */
+        .tuner-container {
+            width: 100%;
+            padding: 10px 0;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            background: #222;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 50px;
+            width: 50px;
+            border-radius: 50%;
+            background: #444;
+            border: 2px solid #888;
+            margin-top: -22px; /* Центрирование относительно трека */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+
+        /* Экран запуска */
+        #overlay-start {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        button {
+            background: transparent;
+            color: #ff4500;
+            border: 2px solid #ff4500;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:active {
+            background: #ff4500;
+            color: #000;
+        }
+
+        .hint {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #555;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="overlay-start">
+        <h2 style="color: #666;">СИСТЕМА ОБНАРУЖЕНИЯ СИГНАЛОВ</h2>
+        <button onclick="init()">ВКЛЮЧИТЬ ПИТАНИЕ</button>
+        <div class="hint">Используйте наушники для лучшего погружения</div>
+    </div>
+
+    <div id="viewport">
+        <div id="vignette"></div>
+    </div>
+
+    <div id="ui-panel">
+        <div id="freq-display">88.0</div>
+        
+        <div class="tuner-container">
+            <input type="range" id="tuner" min="880" max="1080" value="950" step="1">
+        </div>
+        
+        <div style="margin-top: 20px; color: #333; font-size: 10px;">AM/FM RECEIVER UNIT-01</div>
+    </div>
+
+    <audio id="audio-noise" loop>
+        <source src="zvuk/zvuk-nastrojiki-radio.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="audio-voice" loop>
+        <source src="zvuk/street.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const tuner = document.getElementById('tuner');
+        const freqDisplay = document.getElementById('freq-display');
+        const noise = document.getElementById('audio-noise');
+        const voice = document.getElementById('audio-voice');
+        const overlay = document.getElementById('overlay-start');
+
+        // На какой волне голос (например 104.5 MHz)
+        const targetFreq = 104.5;
+
+        function init() {
+            overlay.style.display = 'none';
+            
+            // Запуск аудио
+            noise.play();
+            voice.play();
+            voice.volume = 0;
+            
+            update();
+        }
+
+        function update() {
+            const val = tuner.value / 10;
+            freqDisplay.innerText = val.toFixed(1);
+
+            // Логика поиска
+            const dist = Math.abs(val - targetFreq);
+            let strength = 0;
+
+            if (dist < 1.0) {
+                // Плавное появление голоса в радиусе 1.0 МГц
+                strength = 1 - (dist / 1.0);
+                // Делаем кривую громкости чуть более резкой для реализма
+                strength = Math.pow(strength, 2); 
+            }
+
+            voice.volume = strength;
+            
+            // Шум приглушается, но не исчезает совсем при поимке волны
+            noise.volume = Math.max(0.15, 1 - (strength * 0.7));
+        }
+
+        tuner.addEventListener('input', update);
+
+        // Предотвращаем скролл страницы при движении ползунка на мобилках
+        document.addEventListener('touchmove', function(e) {
+            if (e.target.id === 'tuner') {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    </script>
+</body>
+</html>
