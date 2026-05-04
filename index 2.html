@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Radio Apocalypse: The Door</title>
+    <style>
+        body {
+            background-color: #050505;
+            color: #eee;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Навигация по вкладкам */
+        nav {
+            width: 100%;
+            display: flex;
+            background: #111;
+            border-bottom: 2px solid #222;
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 15px;
+            background: none;
+            border: none;
+            color: #555;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+
+        .nav-btn.active {
+            color: #ff4500;
+            background: #1a1a1a;
+            border-bottom: 2px solid #ff4500;
+        }
+
+        #game-time { font-size: 20px; color: #ffaa00; margin: 10px 0; }
+
+        /* Контейнер для заметок */
+        #notes-container {
+            width: 95%; height: 70px;
+            display: flex; justify-content: center; gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .note-img {
+            height: 60px; width: 60px; object-fit: cover;
+            border: 1px solid #333; opacity: 0; transition: 1s;
+        }
+
+        .discovered { opacity: 1; }
+
+        /* Экраны вкладок */
+        .tab-content { display: none; width: 100%; max-width: 500px; flex-direction: column; align-items: center; }
+        .active-tab { display: flex; }
+
+        #view-radio { width: 100%; aspect-ratio: 16/9; background: url('img/radio.gif') center/cover; }
+        #view-door { width: 100%; aspect-ratio: 16/9; background: url('img/dver.jpg') center/cover; position: relative; }
+
+        #ui-panel { width: 100%; padding: 20px; box-sizing: border-box; text-align: center; }
+        #freq-display { font-size: 38px; color: #ff4500; margin-bottom: 15px; }
+
+        .btn-open {
+            background: #200; color: #f00; border: 2px solid #f00;
+            padding: 20px 40px; cursor: pointer; font-family: inherit; font-weight: bold;
+        }
+
+        /* Смерть и Скример */
+        #screamer-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: #000; z-index: 1000; display: none;
+        }
+        #screamer-video { width: 100%; height: 100%; object-fit: cover; }
+
+        #death-screen {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: #000; z-index: 1001; display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+        }
+
+        #start-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: #000; z-index: 2000; display: flex; justify-content: center; align-items: center;
+        }
+
+        input[type=range] { width: 100%; height: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay"><button onclick="init()" class="btn-open">ВКЛЮЧИТЬ ПИТАНИЕ</button></div>
+
+    <div id="screamer-overlay">
+        <video id="screamer-video" src="img/screamer.mp4"></video>
+    </div>
+
+    <div id="death-screen">
+        <h1 style="color: red; font-size: 50px;">СМЕРТЬ</h1>
+        <button onclick="location.reload()" class="btn-open">НАЧАТЬ ЗАНОВО</button>
+    </div>
+
+    <nav>
+        <button class="nav-btn active" onclick="switchTab('radio', this)">РАДИО</button>
+        <button class="nav-btn" onclick="switchTab('door', this)">ДВЕРЬ</button>
+    </nav>
+
+    <div id="game-time">16:00</div>
+
+    <div id="notes-container">
+        <img id="img-9112007" src="img/9112007.jpg" class="note-img">
+        <img id="img-street" src="img/street.jpg" class="note-img">
+        <img id="img-strictly" src="img/strictly.jpg" class="note-img">
+        <img id="img-street_2" src="img/street_2.jpg" class="note-img">
+    </div>
+
+    <div id="tab-radio" class="tab-content active-tab">
+        <div id="view-radio"></div>
+        <div id="ui-panel">
+            <div id="freq-display">88.0</div>
+            <input type="range" id="tuner" min="880" max="1080" value="900">
+        </div>
+    </div>
+
+    <div id="tab-door" class="tab-content">
+        <div id="view-door"></div>
+        <div id="ui-panel">
+            <button class="btn-open" onclick="triggerScreamer()">ОТКРЫТЬ (F)</button>
+            <p style="color: #444; margin-top: 10px;">Не открывай, если слышишь шаги...</p>
+        </div>
+    </div>
+
+    <audio id="audio-noise" loop src="zvuk/zvuk-nastrojiki-radio.mp3"></audio>
+    <audio id="v-9112007" loop src="zvuk/9112007.mp3"></audio>
+    <audio id="v-street" loop src="zvuk/street.mp3"></audio>
+    <audio id="v-strictly" loop src="zvuk/strictly.mp3"></audio>
+    <audio id="v-street_2" loop src="zvuk/street_2.mp3"></audio>
+
+    <script>
+        const stations = {
+            "9112007": { freq: 91.1, audio: document.getElementById('v-9112007') },
+            "street": { freq: 95.4, audio: document.getElementById('v-street') },
+            "strictly": { freq: 102.1, audio: document.getElementById('v-strictly') },
+            "street_2": { freq: 106.8, audio: document.getElementById('v-street_2') }
+        };
+
+        let hours = 16, minutes = 0;
+
+        function init() {
+            document.getElementById('start-overlay').style.display = 'none';
+            document.getElementById('audio-noise').play();
+            Object.values(stations).forEach(s => { s.audio.play(); s.audio.volume = 0; });
+            setInterval(() => {
+                minutes++;
+                if(minutes>=60) { minutes=0; hours++; }
+                document.getElementById('game-time').innerText = `${hours < 10 ? '0'+hours : hours}:${minutes < 10 ? '0'+minutes : minutes}`;
+                updateTuning();
+            }, 5000);
+        }
+
+        function switchTab(type, btn) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active-tab'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + type).classList.add('active-tab');
+            btn.classList.add('active');
+        }
+
+        function updateTuning() {
+            const val = document.getElementById('tuner').value / 10;
+            document.getElementById('freq-display').innerText = val.toFixed(1);
+            const isLate = (hours > 16 || (hours === 16 && minutes >= 30));
+            
+            const active = isLate ? ["strictly", "street_2"] : ["9112007", "street"];
+            let maxS = 0;
+
+            Object.keys(stations).forEach(key => {
+                const s = stations[key];
+                if (active.includes(key)) {
+                    const d = Math.abs(val - s.freq);
+                    const strength = d < 0.7 ? Math.pow(1-(d/0.7), 2) : 0;
+                    s.audio.volume = strength;
+                    if(strength > 0.8) document.getElementById('img-'+key).classList.add('discovered');
+                    if(strength > maxS) maxS = strength;
+                } else {
+                    s.audio.volume = 0;
+                }
+            });
+            document.getElementById('audio-noise').volume = Math.max(0.1, 1 - (maxS * 0.9));
+        }
+
+        function triggerScreamer() {
+            const video = document.getElementById('screamer-video');
+            document.getElementById('screamer-overlay').style.display = 'block';
+            video.play();
+            setTimeout(() => {
+                document.getElementById('death-screen').style.display = 'flex';
+            }, 4000);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if(e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'а') {
+                if(document.getElementById('tab-door').classList.contains('active-tab')) triggerScreamer();
+            }
+        });
+
+        document.getElementById('tuner').addEventListener('input', updateTuning);
+    </script>
+</body>
+</html>
